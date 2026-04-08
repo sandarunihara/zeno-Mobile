@@ -10,5 +10,7 @@ import com.zeno.auth_service.entity.User;
 @Repository
 public interface UserRepository extends JpaRepository<User,UUID> {
     User findByEmail(String email);
+
+    User findByRefreshToken(String refreshToken);
     
 }

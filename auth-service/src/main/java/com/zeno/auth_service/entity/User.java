@@ -27,6 +27,12 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "fname", nullable = false)
+    private String fname;
+
+    @Column(name = "lname")
+    private String lname;
+
     @Column(unique = true, nullable = false)
     private String email;
 
@@ -35,6 +41,9 @@ public class User {
 
     @Column(name = "gmail_token")
     private String gmailToken;
+
+    @Column(name = "refresh_token")
+    private String refreshToken;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
