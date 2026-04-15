@@ -1,5 +1,7 @@
 package com.zeno.auth_service.service;
 
+import java.util.UUID;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -26,19 +28,19 @@ public class AuthService {
             throw new RuntimeException("User already exists");
         }
 
-        String accesstoken = jwtService.generateAccessToken(request.getEmail());
         String refreshtoken = jwtService.generateRefreshToken(request.getEmail());
-
+        
         user=User.builder()
-                 .fname(request.getFname())
-                 .lname(request.getLname())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .refreshToken(refreshtoken)
-                .build();
-
-        userRepository.save(user);
-
+        .fname(request.getFname())
+        .lname(request.getLname())
+        .email(request.getEmail())
+        .password(passwordEncoder.encode(request.getPassword()))
+        .refreshToken(refreshtoken)
+        .build();
+        
+        User savedUser = userRepository.save(user);
+        
+        String accesstoken = jwtService.generateAccessToken(savedUser.getId(),request.getEmail());
 
         return new AuthResponse(accesstoken, refreshtoken, "User registered successfully");
     }
@@ -53,7 +55,7 @@ public class AuthService {
             throw new RuntimeException("Invalid credentials!");
         }
 
-        String accesstoken= jwtService.generateAccessToken(user.getEmail());
+        String accesstoken= jwtService.generateAccessToken(user.getId(), user.getEmail());
         String refreshtoken = jwtService.generateRefreshToken(user.getEmail());
         user.setRefreshToken(refreshtoken);
         userRepository.save(user);
@@ -74,9 +76,26 @@ public class AuthService {
             throw new RuntimeException("User not found for the provided refresh token!");
         }
 
-        String newaccesstoken = jwtService.generateAccessToken(email);
+        String newaccesstoken = jwtService.generateAccessToken(user.getId(), user.getEmail());
         return new AuthResponse(newaccesstoken, refreshtoken, "Access token refreshed successfully");
 
+    }
+
+    public boolean validateToken(String token){
+        try{
+            String email = jwtService.extractEmail(token);
+            return email != null;
+        }catch(Exception e){
+            return false;
+        }
+    }
+
+    public UUID extractUserIdFromToken(String token){
+        try{
+            return jwtService.extractUserId(token);
+        }catch(Exception e){
+            throw new RuntimeException("Invalid token!");
+        }
     }
 }
 

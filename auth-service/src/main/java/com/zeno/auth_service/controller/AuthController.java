@@ -38,4 +38,23 @@ public class AuthController {
         AuthResponse response = authService.refreshtoken(request);
         return ResponseEntity.ok(response);
     }
-}
+
+    @PostMapping("/extract-user-id")
+    public ResponseEntity<String> extractUserId(@RequestBody String token){
+        try{
+            return ResponseEntity.ok(authService.extractUserIdFromToken(token).toString());
+        }catch(Exception e){
+            return ResponseEntity.badRequest().body("Invalid token!");
+        }
+    }
+
+    @PostMapping("/validate-token")
+    public ResponseEntity<Boolean> validateToken(@RequestBody String token){
+        try{
+            authService.validateToken(token);
+            return ResponseEntity.ok(true);
+        }catch(Exception e){
+            return ResponseEntity.badRequest().body(false);
+        }
+    }
+}   
