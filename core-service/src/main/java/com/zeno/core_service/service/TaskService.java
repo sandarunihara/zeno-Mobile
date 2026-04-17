@@ -3,6 +3,7 @@ package com.zeno.core_service.service;
 import com.zeno.core_service.repository.MoodLogRepository;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -13,7 +14,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zeno.core_service.dto.AiExtractionResponse;
 import com.zeno.core_service.dto.AiTaskResponce;
-import com.zeno.core_service.dto.AiTaskWrapper;
 import com.zeno.core_service.dto.AiTranscriptRequest;
 import com.zeno.core_service.dto.DashboardResponse;
 import com.zeno.core_service.dto.ManualTaskRequest;
@@ -24,7 +24,6 @@ import com.zeno.core_service.repository.TasksRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cglib.core.Local;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -56,6 +55,7 @@ public class TaskService {
             .deadline(request.deadline() != null ? java.time.LocalDateTime.parse(request.deadline()) : null)
             .is_critical(request.isCritical())
             .status("PENDING")
+            .hasMicroSteps(false)
             .build();
         return new TaskResponce(true,tasksRepository.save(task), "Task created successfully");
     }
@@ -107,6 +107,7 @@ public class TaskService {
                             .deadline(dto.deadline())
                             .is_critical("High".equalsIgnoreCase(dto.effortLevel()))
                             .status("PENDING")
+                            .hasMicroSteps(false)
                             .build()
                         ).toList();
             
@@ -123,8 +124,14 @@ public class TaskService {
 
         List<Tasks> allpending = tasksRepository.findByUserIdAndStatus(userId, "PENDING");
 
-        List<Tasks> mainTasks = allpending.stream().filter(t->t.getParentTaskId()==null).toList();
+        // We wrap the entire stream result inside a new ArrayList<>() to unlock it!
+        List<Tasks> mainTasks = new ArrayList<>(allpending.stream()
+                .filter(t -> t.getParentTaskId() == null)
+                .toList());
+
+        // Now it is perfectly safe to sort!
         mainTasks.sort(Comparator.comparing(Tasks::getDeadline, Comparator.nullsLast(Comparator.naturalOrder())));
+
         List<Tasks> displayTasks = new ArrayList<>();
 
         int currentEnergy =moodLogRepository.findFirstByUserIdOrderByLoggedAtDesc(userId)
@@ -133,11 +140,55 @@ public class TaskService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        
+        if (currentEnergy >= 8){
+            boolean hasHighEffortTasks = mainTasks.stream().anyMatch(t -> "High".equalsIgnoreCase(t.getEffort_level()));
+            
+            if (hasHighEffortTasks && keepItLightConsent == null) {
+                return new DashboardResponse(currentEnergy, "You have great energy today! Do you want to tackle your big tasks, or keep it light?", true, new ArrayList<>());
+            }
 
+            if(Boolean.TRUE.equals(keepItLightConsent)){
+                
+                for(Tasks task : mainTasks){
+                    Boolean isUrgent = task.getDeadline() != null && ChronoUnit.HOURS.between(now, task.getDeadline()) <= 48;
 
+                    if( isUrgent && "High".equalsIgnoreCase(task.getEffort_level())){
+                        displayTasks.addAll(getOrGenerateMicroSteps(task, userId));
+                    }else if("Low".equalsIgnoreCase(task.getEffort_level())){
+                        displayTasks.add(task);
+                    }
 
-        return null;
+                }
+                return new DashboardResponse(currentEnergy, "Respecting your boundaries. I hid the big stuff, but broke down your urgent tasks so you don't fall behind.", false, displayTasks);
+            }
+
+            return new DashboardResponse(currentEnergy, "Let's crush it today!", false, mainTasks);
+        }
+
+        if(currentEnergy <= 4){
+            int nonUrgentRoutineCount = 0;
+
+            for(Tasks task : mainTasks){
+                Boolean isUrgent = task.getDeadline() != null && ChronoUnit.HOURS.between(now, task.getDeadline()) <= 48;
+
+                if(isUrgent){
+                    if("High".equalsIgnoreCase(task.getEffort_level())){
+                        displayTasks.addAll(getOrGenerateMicroSteps(task, userId));
+                    }else{
+                        displayTasks.add(task);
+                    }
+                }else{
+                    if("Low".equalsIgnoreCase(task.getEffort_level()) && nonUrgentRoutineCount < 3){
+                        displayTasks.add(task);
+                        nonUrgentRoutineCount++;
+                    }
+                }
+            }
+            return new DashboardResponse(currentEnergy, "You're running on empty. I've isolated your urgent deadlines and a few easy wins.", false, displayTasks);
+        }
+
+        // Default / Medium Energy (5-7)
+        return new DashboardResponse(currentEnergy, "Here is your agenda for today.", false, mainTasks);
     }
 
     // Helper method to keep code clean
@@ -160,6 +211,47 @@ public class TaskService {
         String response = restTemplate.postForObject(groqApiUrl, entity, String.class);
         JsonNode rootNode = objectMapper.readTree(response);
         return rootNode.path("choices").get(0).path("message").path("content").asText();
+    }
+
+    private List<Tasks> getOrGenerateMicroSteps(Tasks parentTask, UUID userId) {
+        // Check if we already broke this down previously
+        List<Tasks> existingSteps = tasksRepository.findByParentTaskId(parentTask.getId());
+        if (!existingSteps.isEmpty()) return existingSteps;
+
+        // If not, ask Groq to break it down into 3 tiny steps
+        try {
+            String parentDeadlineStr = parentTask.getDeadline() != null ? parentTask.getDeadline().toString() : "No strict deadline";
+
+            String prompt = "Break down this main task: '" + parentTask.getTitle() + " - " + parentTask.getDescription() + "' into exactly 3 incredibly tiny, low-effort micro-steps. "
+                    + "The final deadline for this main task is exactly: " + parentDeadlineStr + ". "
+                    + "I need you to STAGGER the deadlines for the 3 micro-steps working backwards. "
+                    + "For example, make Step 1 due 5 hours before the final deadline, Step 2 due 2 hours before, and Step 3 due exactly at the final deadline. "
+                    + "Return a JSON object with a 'tasks' array. Each object needs 'title' (string), 'description' (string), 'effortLevel' ('Low'), and 'deadline' (string, strict ISO-8601 format).";
+            String response = callGroqApi(prompt);
+            AiExtractionResponse extractedData = objectMapper.readValue(response, AiExtractionResponse.class);
+
+            List<Tasks> microSteps = extractedData.tasks().stream().map(dto ->
+                    Tasks.builder()
+                            .userId(userId)
+                            .title(dto.title())
+                            .description(dto.description())
+                            .effort_level("Low")
+                            .deadline(dto.deadline() != null ? dto.deadline() : parentTask.getDeadline()) // Inherit deadline from parent
+                            .is_critical(parentTask.getIs_critical()) // Inherit criticality from parent
+                            .status("PENDING")
+                            .parentTaskId(parentTask.getId())
+                            .build()
+            ).toList();
+
+            parentTask.setHasMicroSteps(true);
+            tasksRepository.save(parentTask); // Update parent to indicate it has micro-steps now
+
+            return tasksRepository.saveAll(microSteps);
+
+        } catch (Exception e) {
+            // Fallback if AI fails: just return the parent task
+            return List.of(parentTask);
+        }
     }
 
     public TaskResponce UpdateTask(UUID userId,Long taskId,ManualTaskRequest request){

@@ -15,12 +15,18 @@ public class GlobalExceptionHandler {
     // This tells Spring: "If a RuntimeException happens anywhere, send it here!"
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {
+
+        // 1. PRINT THE ERROR TO THE TERMINAL! This is crucial for debugging.
+        ex.printStackTrace(); 
+        
+        // 2. If the message is null (like an NPE), print the name of the exception instead.
+        String errorMessage = ex.getMessage() == null ? ex.toString() : ex.getMessage();
         
         ErrorResponse errorResponse = new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),
                 "Bad Request",
-                ex.getMessage(),
+                errorMessage,
                 false
         );
 
@@ -41,4 +47,6 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
+
+    
 }

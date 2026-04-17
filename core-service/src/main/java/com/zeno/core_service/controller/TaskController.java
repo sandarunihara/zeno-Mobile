@@ -8,10 +8,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.zeno.core_service.dto.AiTaskResponce;
 import com.zeno.core_service.dto.AiTranscriptRequest;
+import com.zeno.core_service.dto.DashboardResponse;
 import com.zeno.core_service.dto.ManualTaskRequest;
 import com.zeno.core_service.dto.TaskResponce;
 import com.zeno.core_service.service.AuthServiceClient;
@@ -50,6 +52,19 @@ public class TaskController {
     public ResponseEntity<AiTaskResponce> createTaskFromTranscript(HttpServletRequest httprequest ,@RequestBody AiTranscriptRequest request){
         UUID userId = getUserIdFromAuthService(httprequest);
         return ResponseEntity.ok(taskService.createTaskFromTranscript(userId, request));
+    }
+
+    @GetMapping("/dashboard")
+    public ResponseEntity<DashboardResponse> getSmartDashboard(
+            @RequestParam(required = false) Boolean keepItLight,
+            HttpServletRequest httpRequest) {
+
+        UUID userId = getUserIdFromAuthService(httpRequest);
+        
+        // Passes the user ID and their potential answer to the "Keep it light?" question
+        DashboardResponse dashboard = taskService.getSmartDashboard(userId, keepItLight);
+        
+        return ResponseEntity.ok(dashboard);
     }
 
     @PostMapping("/updatetask/{id}")

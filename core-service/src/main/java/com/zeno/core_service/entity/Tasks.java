@@ -50,4 +50,7 @@ public class Tasks {
     @Column(name = "parent_task_id")
     private Long parentTaskId;
 
+    @Column(name = "has_micro_steps")
+    private Boolean hasMicroSteps;
+
 }
