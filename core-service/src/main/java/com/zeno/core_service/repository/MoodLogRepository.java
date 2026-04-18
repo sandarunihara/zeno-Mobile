@@ -12,4 +12,5 @@ import com.zeno.core_service.entity.MoodLog;
 public interface MoodLogRepository extends JpaRepository<MoodLog, Long> {
     // Finds the absolute latest mood check-in for this user
     Optional<MoodLog> findFirstByUserIdOrderByLoggedAtDesc(UUID userId);
+
 }

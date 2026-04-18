@@ -16,6 +16,7 @@ import com.zeno.core_service.dto.AiTranscriptRequest;
 import com.zeno.core_service.dto.DashboardResponse;
 import com.zeno.core_service.dto.ManualTaskRequest;
 import com.zeno.core_service.dto.TaskResponce;
+import com.zeno.core_service.dto.Taskfullresponce;
 import com.zeno.core_service.service.AuthServiceClient;
 import com.zeno.core_service.service.TaskService;
 
@@ -73,10 +74,27 @@ public class TaskController {
         return ResponseEntity.ok(taskService.UpdateTask(userId, id, request));
     }
 
+    @PostMapping("/completetask/{id}")
+    public ResponseEntity<TaskResponce> completeTask(HttpServletRequest httprequest, @PathVariable Long id){
+        UUID userId = getUserIdFromAuthService(httprequest);
+        return ResponseEntity.ok(taskService.completeTask(userId, id));
+    }
+
     @GetMapping("/deletetask/{id}")
     public ResponseEntity<TaskResponce> deleteTask(HttpServletRequest httprequest, @PathVariable Long id){
         UUID userId = getUserIdFromAuthService(httprequest);
         return ResponseEntity.ok(taskService.deleteTask(userId, id));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<Taskfullresponce> getTask(HttpServletRequest httprequest, @PathVariable Long id){
+        UUID userId = getUserIdFromAuthService(httprequest);
+        return ResponseEntity.ok(taskService.getTask(userId, id));
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<?> getTasks(HttpServletRequest httprequest){
+        UUID userId = getUserIdFromAuthService(httprequest);
+        return ResponseEntity.ok(taskService.getTasks(userId));
+    }
 }

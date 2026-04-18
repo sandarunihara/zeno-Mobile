@@ -18,6 +18,7 @@ import com.zeno.core_service.dto.AiTranscriptRequest;
 import com.zeno.core_service.dto.DashboardResponse;
 import com.zeno.core_service.dto.ManualTaskRequest;
 import com.zeno.core_service.dto.TaskResponce;
+import com.zeno.core_service.dto.Taskfullresponce;
 import com.zeno.core_service.entity.MoodLog;
 import com.zeno.core_service.entity.Tasks;
 import com.zeno.core_service.repository.TasksRepository;
@@ -27,7 +28,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.scheduling.config.Task;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -83,22 +83,39 @@ public class TaskService {
             // F. Convert the AI's JSON array into our Java Wrapper
             AiExtractionResponse extractedData = objectMapper.readValue(response, AiExtractionResponse.class);
 
+            MoodLog latestMood = moodLogRepository.findFirstByUserIdOrderByLoggedAtDesc(userId).orElse(null);
+
             // Save the Mood! [cite: 154]
             if (extractedData.mood() != null) {
-                MoodLog mood = MoodLog.builder()
-                        .userId(userId)
-                        .energyScore(extractedData.mood().energyScore())
-                        .sentiment(extractedData.mood().sentiment())
-                        .dataSource("manual") // From audio transcript
-                        .build();
-                        
-                moodLogRepository.save(mood);
+
+                if(latestMood == null){
+                    MoodLog mood = MoodLog.builder()
+                            .userId(userId)
+                            .energyScore(extractedData.mood().energyScore())
+                            .sentiment(extractedData.mood().sentiment())
+                            .dataSource("audio_transcript") // From audio transcript
+                            .build();
+                            
+                    moodLogRepository.save(mood);
+                    
+                }else{
+                    latestMood.setEnergyScore(extractedData.mood().energyScore());
+                    latestMood.setSentiment(extractedData.mood().sentiment());
+                    latestMood.setLoggedAt(LocalDateTime.now());
+                    latestMood.setDataSource("audio_transcript");
+                    moodLogRepository.save(latestMood);
+                }
+
             }
 
-            // TODO: when how already mood for that user need to update it instead of creating new one, we can use energyScore to update it or create new one based on time difference between them
-
             // Save the Tasks [cite: 153]
-            List<Tasks> newTasks = extractedData.tasks().stream().map(dto ->
+            if (extractedData.tasks() == null || extractedData.tasks().isEmpty()) {
+                return new AiTaskResponce(true, List.of(), "No actionable tasks found in transcript");
+            }
+
+            List<Tasks> newTasks = extractedData.tasks().stream()
+                    .filter(dto -> !isNoTaskPlaceholder(dto.title(), dto.description()))
+                    .map(dto ->
                     Tasks.builder()
                             .userId(userId)
                             .title(dto.title())
@@ -110,7 +127,11 @@ public class TaskService {
                             .hasMicroSteps(false)
                             .build()
                         ).toList();
-            
+
+            if (newTasks.isEmpty()) {
+                return new AiTaskResponce(true, List.of(), "No actionable tasks found in transcript");
+            }
+
             tasksRepository.saveAll(newTasks);
 
             return new AiTaskResponce(true, newTasks, "Tasks created successfully from transcript");
@@ -128,6 +149,13 @@ public class TaskService {
         List<Tasks> mainTasks = new ArrayList<>(allpending.stream()
                 .filter(t -> t.getParentTaskId() == null)
                 .toList());
+
+        if(mainTasks.isEmpty()){
+            int currentEnergy =moodLogRepository.findFirstByUserIdOrderByLoggedAtDesc(userId)
+                .map(MoodLog::getEnergyScore)
+                .orElse(5); 
+            return new DashboardResponse(currentEnergy, "No tasks on the horizon! Take a deep breath and enjoy the calm.", false, new ArrayList<>());
+        }
 
         // Now it is perfectly safe to sort!
         mainTasks.sort(Comparator.comparing(Tasks::getDeadline, Comparator.nullsLast(Comparator.naturalOrder())));
@@ -161,7 +189,6 @@ public class TaskService {
                 }
                 return new DashboardResponse(currentEnergy, "Respecting your boundaries. I hid the big stuff, but broke down your urgent tasks so you don't fall behind.", false, displayTasks);
             }
-
             return new DashboardResponse(currentEnergy, "Let's crush it today!", false, mainTasks);
         }
 
@@ -254,6 +281,18 @@ public class TaskService {
         }
     }
 
+    private boolean isNoTaskPlaceholder(String title, String description) {
+        String normalizedTitle = title == null ? "" : title.trim().toLowerCase();
+        String normalizedDescription = description == null ? "" : description.trim().toLowerCase();
+
+        return normalizedTitle.equals("no tasks")
+                || normalizedTitle.equals("no task")
+                || normalizedTitle.contains("nothing to do")
+                || normalizedDescription.contains("no tasks")
+                || normalizedDescription.contains("no responsibilities")
+                || normalizedDescription.contains("nothing to do");
+    }
+
     public TaskResponce UpdateTask(UUID userId,Long taskId,ManualTaskRequest request){
 
         Tasks existingTask = tasksRepository.findByIdAndUserId(taskId, userId);
@@ -274,6 +313,15 @@ public class TaskService {
         return new TaskResponce(true, tasksRepository.save(existingTask), "Task updated successfully");
     }
 
+    public TaskResponce completeTask(UUID userId, Long taskId){
+        Tasks existingTask = tasksRepository.findByIdAndUserId(taskId, userId);
+        if (existingTask == null) {
+            return new TaskResponce(false, null, "Task not found");
+        }
+        existingTask.setStatus("COMPLETED");
+        return new TaskResponce(true, tasksRepository.save(existingTask), "Task marked as completed");
+    }
+
     public TaskResponce deleteTask(UUID userId, Long taskId){
         Tasks existingTask = tasksRepository.findByIdAndUserId(taskId, userId);
         if (existingTask == null) {
@@ -283,5 +331,26 @@ public class TaskService {
         return new TaskResponce(true, null, "Task deleted successfully");
     }
 
-    // TODO: Implement getTasks and getTaskById methods
+
+    public Taskfullresponce getTask(UUID userId, Long taskId){
+        Tasks task =  tasksRepository.findByIdAndUserId(taskId, userId);
+        List<Tasks> microSteps = new ArrayList<>();
+        Tasks parentTask = null;
+
+        if (task == null) {
+            throw new RuntimeException("Task not found");
+        }
+        if(task.getHasMicroSteps() != null && task.getHasMicroSteps()){
+            microSteps = tasksRepository.findByParentTaskId(task.getId());
+        }
+        if (task.getParentTaskId() != null) {
+            parentTask = tasksRepository.findById(task.getParentTaskId()).orElse(null);
+        }
+
+        return new Taskfullresponce(true, task, microSteps, parentTask, "Task found successfully");
+    }
+
+    public List<Tasks> getTasks(UUID userId){
+        return tasksRepository.findByUserId(userId);
+    }
 }
