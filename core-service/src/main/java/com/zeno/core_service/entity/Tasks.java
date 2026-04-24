@@ -1,6 +1,7 @@
 package com.zeno.core_service.entity;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -9,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -52,5 +54,8 @@ public class Tasks {
 
     @Column(name = "has_micro_steps")
     private Boolean hasMicroSteps;
+
+    @Transient // Tells Hibernate to include this in JSON, but NOT in PostgreSQL
+    private List<Tasks> microSteps;
 
 }

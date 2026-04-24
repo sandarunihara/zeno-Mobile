@@ -1,5 +1,6 @@
 package com.zeno.core_service.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -18,7 +19,7 @@ public class MoodlogService {
     private final MoodLogRepository moodLogRepository;
 
     
-    public Moodlog updateorcreateMoodlog(int mood, UUID userid ){
+    public Moodlog updateorcreateMoodlog(int mood, UUID userid ,Boolean isLight) {
         MoodLog moodLog = moodLogRepository.findFirstByUserIdOrderByLoggedAtDesc(userid).orElse(null);
         if (moodLog != null) {
 
@@ -26,6 +27,7 @@ public class MoodlogService {
             moodLog.setLoggedAt(java.time.LocalDateTime.now());
             moodLog.setDataSource("manual");
             moodLog.setSentiment(calculateSentiment(mood));
+            moodLog.setIsLight(isLight);
             moodLogRepository.save(moodLog);
             return new Moodlog(true, moodLog, "Mood log updated successfully.");
             
@@ -37,6 +39,7 @@ public class MoodlogService {
         newMoodLog.setLoggedAt(java.time.LocalDateTime.now());
         newMoodLog.setDataSource("manual");
         newMoodLog.setSentiment(calculateSentiment(mood));
+        newMoodLog.setIsLight(isLight);
         moodLogRepository.save(newMoodLog);
         return new Moodlog(true, newMoodLog, "Mood log created successfully.");
     }
@@ -58,10 +61,10 @@ public class MoodlogService {
     public Moodlog getLatestMoodlog(UUID userid) {
         MoodLog moodLog = moodLogRepository.findFirstByUserIdOrderByLoggedAtDesc(userid).orElse(null);
         if (moodLog != null) {
-            if(moodLog.getLoggedAt() == LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.DAYS)){
-                return new Moodlog(true, moodLog, "Latest mood log retrieved successfully.");
+            if (moodLog.getLoggedAt().toLocalDate().isBefore(LocalDate.now())){
+                return new Moodlog(false, moodLog, "Needed update.");
             }
-            return new Moodlog(false, moodLog, "Needed update.");
+            return new Moodlog(true, moodLog, "Latest mood log retrieved successfully.");
         } else {
             return new Moodlog(false, null, "No mood logs found for this user.");
         }

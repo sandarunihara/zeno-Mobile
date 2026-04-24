@@ -36,12 +36,14 @@ public class GlobalExceptionHandler {
     // (Optional) Catch absolute everything else just in case
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex) {
+        ex.printStackTrace();
+        String errorMessage = ex.getMessage() == null ? ex.toString() : ex.getMessage();
         
         ErrorResponse errorResponse = new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "Server Error",
-                "Something went wrong on the server." ,
+            errorMessage,
                 false
         );
 

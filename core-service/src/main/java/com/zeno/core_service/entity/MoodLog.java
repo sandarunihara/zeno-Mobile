@@ -36,4 +36,7 @@ public class MoodLog {
     protected void onCreate() {
         this.loggedAt = LocalDateTime.now();
     }
+
+    @Column(name = "isLight")
+    private Boolean isLight;
 }

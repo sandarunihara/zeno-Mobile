@@ -51,8 +51,8 @@ public class AuthController {
     @PostMapping("/validate-token")
     public ResponseEntity<Boolean> validateToken(@RequestBody String token){
         try{
-            authService.validateToken(token);
-            return ResponseEntity.ok(true);
+            boolean valid = authService.validateToken(token);
+            return ResponseEntity.ok(valid);
         }catch(Exception e){
             return ResponseEntity.badRequest().body(false);
         }
