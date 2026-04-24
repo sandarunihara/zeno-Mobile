@@ -168,44 +168,54 @@ public class TaskService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        if (currentEnergy >= 8){
+        if (currentEnergy >= 8) {
             boolean hasHighEffortTasks = mainTasks.stream().anyMatch(t -> "High".equalsIgnoreCase(t.getEffort_level()));
-            
+
             if (hasHighEffortTasks && keepItLightConsent == null) {
                 return new DashboardResponse(currentEnergy, "You have great energy today! Do you want to tackle your big tasks, or keep it light?", true, new ArrayList<>());
             }
 
-            if(Boolean.TRUE.equals(keepItLightConsent)){
-                
-                for(Tasks task : mainTasks){
+            if (Boolean.TRUE.equals(keepItLightConsent)) {
+
+                for (Tasks task : mainTasks) {
                     Boolean isUrgent = task.getDeadline() != null && ChronoUnit.HOURS.between(now, task.getDeadline()) <= 48;
 
-                    if( isUrgent && "High".equalsIgnoreCase(task.getEffort_level())){
-                        displayTasks.addAll(getOrGenerateMicroSteps(task, userId));
-                    }else if("Low".equalsIgnoreCase(task.getEffort_level())){
+                    if (isUrgent && "High".equalsIgnoreCase(task.getEffort_level())) {
+                        // THE FIX: Fetch steps, nest them inside the parent, then add the parent!
+                        task.setMicroSteps(getOrGenerateMicroSteps(task, userId));
+                        displayTasks.add(task);
+                    } else if ("Low".equalsIgnoreCase(task.getEffort_level())) {
+                        // If a low-effort task happens to have existing steps, attach them
+                        if (Boolean.TRUE.equals(task.getHasMicroSteps())) {
+                            task.setMicroSteps(tasksRepository.findByParentTaskId(task.getId()));
+                        }
                         displayTasks.add(task);
                     }
-
                 }
                 return new DashboardResponse(currentEnergy, "Respecting your boundaries. I hid the big stuff, but broke down your urgent tasks so you don't fall behind.", false, displayTasks);
             }
+            
+            attachExistingMicroSteps(mainTasks);
             return new DashboardResponse(currentEnergy, "Let's crush it today!", false, mainTasks);
         }
 
-        if(currentEnergy <= 4){
+        if (currentEnergy <= 4) {
             int nonUrgentRoutineCount = 0;
 
-            for(Tasks task : mainTasks){
+            for (Tasks task : mainTasks) {
                 Boolean isUrgent = task.getDeadline() != null && ChronoUnit.HOURS.between(now, task.getDeadline()) <= 48;
 
-                if(isUrgent){
-                    if("High".equalsIgnoreCase(task.getEffort_level())){
-                        displayTasks.addAll(getOrGenerateMicroSteps(task, userId));
-                    }else{
+                if (isUrgent) {
+                    if ("High".equalsIgnoreCase(task.getEffort_level())) {
+                        task.setMicroSteps(getOrGenerateMicroSteps(task, userId));
+                        displayTasks.add(task);
+                    } else {
+                        if (Boolean.TRUE.equals(task.getHasMicroSteps())) task.setMicroSteps(tasksRepository.findByParentTaskId(task.getId()));
                         displayTasks.add(task);
                     }
-                }else{
-                    if("Low".equalsIgnoreCase(task.getEffort_level()) && nonUrgentRoutineCount < 3){
+                } else {
+                    if ("Low".equalsIgnoreCase(task.getEffort_level()) && nonUrgentRoutineCount < 3) {
+                        if (Boolean.TRUE.equals(task.getHasMicroSteps())) task.setMicroSteps(tasksRepository.findByParentTaskId(task.getId()));
                         displayTasks.add(task);
                         nonUrgentRoutineCount++;
                     }
@@ -214,7 +224,7 @@ public class TaskService {
             return new DashboardResponse(currentEnergy, "You're running on empty. I've isolated your urgent deadlines and a few easy wins.", false, displayTasks);
         }
 
-        // Default / Medium Energy (5-7)
+        attachExistingMicroSteps(mainTasks);
         return new DashboardResponse(currentEnergy, "Here is your agenda for today.", false, mainTasks);
     }
 
@@ -278,6 +288,14 @@ public class TaskService {
         } catch (Exception e) {
             // Fallback if AI fails: just return the parent task
             return List.of(parentTask);
+        }
+    }
+
+    private void attachExistingMicroSteps(List<Tasks> tasksList) {
+        for (Tasks task : tasksList) {
+            if (Boolean.TRUE.equals(task.getHasMicroSteps())) {
+                task.setMicroSteps(tasksRepository.findByParentTaskId(task.getId()));
+            }
         }
     }
 
