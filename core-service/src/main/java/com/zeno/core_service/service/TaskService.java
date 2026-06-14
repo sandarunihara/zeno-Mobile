@@ -171,6 +171,7 @@ public class TaskService {
         if (currentEnergy >= 8) {
             boolean hasHighEffortTasks = mainTasks.stream().anyMatch(t -> "High".equalsIgnoreCase(t.getEffort_level()));
 
+            //TODO : no need
             if (hasHighEffortTasks && keepItLightConsent == null) {
                 return new DashboardResponse(currentEnergy, "You have great energy today! Do you want to tackle your big tasks, or keep it light?", true, new ArrayList<>());
             }

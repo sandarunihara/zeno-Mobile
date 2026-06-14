@@ -17,3 +17,8 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+
+groq:
+  api:
+    key: "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"
+    url: "https://api.groq.com/openai/v1/chat/completions"
