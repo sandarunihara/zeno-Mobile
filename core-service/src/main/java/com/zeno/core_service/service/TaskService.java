@@ -19,6 +19,7 @@ import com.zeno.core_service.dto.DashboardResponse;
 import com.zeno.core_service.dto.ManualTaskRequest;
 import com.zeno.core_service.dto.TaskResponce;
 import com.zeno.core_service.dto.Taskfullresponce;
+import com.zeno.core_service.dto.TaskDto;
 import com.zeno.core_service.entity.MoodLog;
 import com.zeno.core_service.entity.Tasks;
 import com.zeno.core_service.repository.TasksRepository;
@@ -65,17 +66,21 @@ public class TaskService {
 
         try{
 
+            String currentDateTime = LocalDateTime.now().withNano(0).toString();
+            
             // A. Prepare the strict prompt for MULTIPLE tasks
-            String prompt = "You are a data-extraction assistant. Analyze this user transcript: '" + request.transcript() + "'. "
+            String prompt = "You are a data-extraction assistant. The current date and time is " + currentDateTime + ". "
+                            + "Analyze this user transcript: '" + request.transcript() + "'. "
                             + "Return ONLY a valid JSON object with two keys: 'tasks' and 'mood'. "
                             + "1. 'tasks': An array of objects. Each object must have: "
                             + "'title' (string, a short clean task name), "
                             + "'description' (string, a more detailed explanation), "
                             + "'effortLevel' (string, either 'Low' or 'High'), "
-                            + "'deadline' (string, ISO-8601 format like '2026-04-16T17:00:00', or null). "
+                            + "'deadline' (string, ISO-8601 format like '" + currentDateTime + "', calculate accurate relative dates based on the current date, or null if no deadline). "
                             + "2. 'mood': guess their current state. An object containing: "
-                            + "'energyScore' (integer 1 to 10 based on their vibe) and "
-                            + "'sentiment' (short string like 'anxious', 'calm', or 'motivated'). "
+                            + "'energyScore' (integer 1 to 10 based on their vibe), "
+                            + "'sentiment' (short string like 'anxious', 'calm', or 'motivated'), and "
+                            + "'isLight' (boolean, true if the user prefers to avoid deep thinking, complex creative work, or heavy cognitive effort — for example, they want to focus on tactical execution, quick wins, routine admin, or setup/prep work rather than deep strategizing or creating from scratch, even if their energy is high and they are being very productive; false if they are ready and willing to dive into demanding, high-concentration, deep-focus work like writing narratives, strategic planning, or complex problem-solving). "
                             + "Ensure the response is strictly valid JSON.";
 
             String response = callGroqApi(prompt);
@@ -93,14 +98,16 @@ public class TaskService {
                             .userId(userId)
                             .energyScore(extractedData.mood().energyScore())
                             .sentiment(extractedData.mood().sentiment())
-                            .dataSource("audio_transcript") // From audio transcript
+                            .isLight(extractedData.mood().isLight())
+                            .dataSource("audio_transcript")
                             .build();
-                            
+
                     moodLogRepository.save(mood);
                     
                 }else{
                     latestMood.setEnergyScore(extractedData.mood().energyScore());
                     latestMood.setSentiment(extractedData.mood().sentiment());
+                    latestMood.setIsLight(extractedData.mood().isLight());
                     latestMood.setLoggedAt(LocalDateTime.now());
                     latestMood.setDataSource("audio_transcript");
                     moodLogRepository.save(latestMood);
@@ -134,6 +141,22 @@ public class TaskService {
 
             tasksRepository.saveAll(newTasks);
 
+            //todo: here create a new method to create a micro task for each task using Groq API
+            // Optional<MoodLog> mooddata1 =moodLogRepository.findFirstByUserIdOrderByLoggedAtDesc(userId);
+            // if (mooddata1.isPresent()) {
+            //     MoodLog moodLog = mooddata1.get();
+                
+            //     int energyScore = moodLog.getEnergyScore();
+            //     boolean isLight = Boolean.TRUE.equals(moodLog.getIsLight());
+            // } else {
+            //     // Handle the case where no data was found for this user
+            //     System.out.println("No mood log found for this user.");
+            // }
+            // for(Tasks task : newTasks){
+
+            // }
+            
+
             return new AiTaskResponce(true, newTasks, "Tasks created successfully from transcript");
 
         }catch (Exception e){
@@ -147,7 +170,7 @@ public class TaskService {
 
         // We wrap the entire stream result inside a new ArrayList<>() to unlock it!
         List<Tasks> mainTasks = new ArrayList<>(allpending.stream()
-                .filter(t -> t.getParentTaskId() == null)
+                .filter(t -> t.getParentTaskId() == null && (t.getDeadline() == null || !t.getDeadline().isBefore(LocalDateTime.now())))
                 .toList());
 
         if(mainTasks.isEmpty()){
@@ -164,7 +187,9 @@ public class TaskService {
 
         int currentEnergy =moodLogRepository.findFirstByUserIdOrderByLoggedAtDesc(userId)
                 .map(MoodLog::getEnergyScore)
-                .orElse(5); 
+                .orElse(5);
+
+        System.out.println(moodLogRepository.findFirstByUserIdOrderByLoggedAtDesc(userId));
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -325,6 +350,7 @@ public class TaskService {
             existingTask.setEffort_level(request.effortLevel()== null ? existingTask.getEffort_level() : request.effortLevel());
             existingTask.setDeadline(request.deadline() != null ? java.time.LocalDateTime.parse(request.deadline()) : existingTask.getDeadline());
             existingTask.setIs_critical(request.isCritical()== null ? existingTask.getIs_critical() : request.isCritical());
+            existingTask.setStatus(request.status()== null ? existingTask.getStatus() : request.status());
         }catch (Exception e){
             return new TaskResponce(false, null, "Invalid input: " + e.getMessage());
         }
@@ -369,7 +395,36 @@ public class TaskService {
         return new Taskfullresponce(true, task, microSteps, parentTask, "Task found successfully");
     }
 
-    public List<Tasks> getTasks(UUID userId){
-        return tasksRepository.findByUserId(userId);
+    public List<TaskDto> getTasks(UUID userId){
+        List<Tasks> allTasks = tasksRepository.findByUserId(userId);
+        
+        return allTasks.stream()
+            .filter(t -> t.getParentTaskId() == null)
+            .map(t -> mapToDto(t, allTasks))
+            .toList();
+    }
+
+    private TaskDto mapToDto(Tasks task, List<Tasks> allTasks) {
+        TaskDto dto = TaskDto.builder()
+            .id(task.getId())
+            .userId(task.getUserId())
+            .title(task.getTitle())
+            .description(task.getDescription())
+            .effort_level(task.getEffort_level())
+            .deadline(task.getDeadline())
+            .is_critical(task.getIs_critical())
+            .status(task.getStatus())
+            .parentTaskId(task.getParentTaskId())
+            .hasMicroSteps(task.getHasMicroSteps())
+            .build();
+            
+        if (Boolean.TRUE.equals(task.getHasMicroSteps())) {
+            List<TaskDto> microSteps = allTasks.stream()
+                .filter(t -> task.getId().equals(t.getParentTaskId()))
+                .map(t -> mapToDto(t, allTasks))
+                .toList();
+            dto.setMicroSteps(microSteps);
+        }
+        return dto;
     }
 }

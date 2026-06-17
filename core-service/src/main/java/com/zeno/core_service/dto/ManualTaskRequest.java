@@ -5,5 +5,6 @@ public record ManualTaskRequest(
     String description,
     String effortLevel,
     String deadline,
-    Boolean isCritical
+    Boolean isCritical,
+    String status
 ) {}
