@@ -9,6 +9,8 @@ import org.springframework.web.client.RestTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class GmailService {
@@ -82,14 +84,77 @@ public class GmailService {
         try {
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return (String) response.getBody().get("snippet");
-                // Note: snippet is usually up to 200 chars. 
-                // For a full implementation, we would extract the decoded body from payload.parts.
-                // For this demo, snippet provides a good amount of summary or we can send snippet to AI.
+                Map<String, Object> bodyMap = response.getBody();
+                Map<String, Object> payload = (Map<String, Object>) bodyMap.get("payload");
+                String fullBody = extractBodyFromPayload(payload);
+                if (fullBody != null && !fullBody.trim().isEmpty()) {
+                    return fullBody;
+                }
+                // Fallback to snippet if body decoding yields nothing
+                return (String) bodyMap.get("snippet");
             }
         } catch (Exception e) {
             System.err.println("Failed to fetch email " + messageId + ": " + e.getMessage());
         }
         return null;
+    }
+
+    private String extractBodyFromPayload(Map<String, Object> payload) {
+        if (payload == null) return null;
+
+        // Try to get body data from the top level (singlepart message)
+        Map<String, Object> body = (Map<String, Object>) payload.get("body");
+        if (body != null && body.get("data") != null) {
+            String base64Data = (String) body.get("data");
+            return decodeBase64(base64Data);
+        }
+
+        // Try to traverse parts (multipart message)
+        List<Map<String, Object>> parts = (List<Map<String, Object>>) payload.get("parts");
+        if (parts != null) {
+            return extractBodyFromParts(parts);
+        }
+
+        return null;
+    }
+
+    private String extractBodyFromParts(List<Map<String, Object>> parts) {
+        // Look for text/plain first, then text/html
+        String htmlBody = null;
+        for (Map<String, Object> part : parts) {
+            String mimeType = (String) part.get("mimeType");
+            Map<String, Object> body = (Map<String, Object>) part.get("body");
+            
+            if (body != null && body.get("data") != null) {
+                String base64Data = (String) body.get("data");
+                String decoded = decodeBase64(base64Data);
+                
+                if ("text/plain".equalsIgnoreCase(mimeType)) {
+                    return decoded; // Prefer plain text
+                } else if ("text/html".equalsIgnoreCase(mimeType)) {
+                    htmlBody = decoded;
+                }
+            }
+
+            // Recursive search for nested parts (e.g. multipart/alternative inside multipart/mixed)
+            List<Map<String, Object>> subParts = (List<Map<String, Object>>) part.get("parts");
+            if (subParts != null) {
+                String result = extractBodyFromParts(subParts);
+                if (result != null) {
+                    return result;
+                }
+            }
+        }
+        return htmlBody;
+    }
+
+    private String decodeBase64(String base64Data) {
+        try {
+            byte[] decodedBytes = Base64.getUrlDecoder().decode(base64Data);
+            return new String(decodedBytes, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            System.err.println("Failed to decode base64 data: " + e.getMessage());
+            return null;
+        }
     }
 }

@@ -17,3 +17,8 @@ eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+
+google:
+  client:
+    id: "636937484642-75d0g92ab923ucc30fqjgl8a9hh0ahln.apps.googleusercontent.com"
+    secret: "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"

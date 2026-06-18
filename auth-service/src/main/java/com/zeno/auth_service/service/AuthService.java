@@ -79,8 +79,25 @@ public class AuthService {
 
     }
 
-    public void connectGmail(com.zeno.auth_service.dto.ConnectGmailRequest request){
-        User user = userRepository.findByEmail(request.getEmail());
+    public User getUserById(UUID id) {
+        return userRepository.findById(id).orElse(null);
+    }
+
+    public void connectGmail(String token, com.zeno.auth_service.dto.ConnectGmailRequest request){
+        User user = null;
+        if (token != null) {
+            try {
+                UUID userId = jwtService.extractUserId(token);
+                user = userRepository.findById(userId).orElse(null);
+            } catch (Exception e) {
+                System.err.println("Failed to extract userId from token in connectGmail: " + e.getMessage());
+            }
+        }
+
+        if (user == null) {
+            user = userRepository.findByEmail(request.getEmail());
+        }
+
         if(user == null){
             throw new RuntimeException("User not found!");
         }
@@ -119,10 +136,9 @@ public class AuthService {
             }
         } catch (Exception e) {
             System.err.println("Error exchanging code: " + e.getMessage());
-            // If the frontend already sends a refresh token, we can fallback to it
-            return code;
+            throw new RuntimeException("Google token exchange failed: " + e.getMessage());
         }
-        return code; // Fallback in case the frontend actually sends a refresh token
+        return null;
     }
 
     public List<GoogleConnectedUserDto> getGoogleConnectedUsers() {

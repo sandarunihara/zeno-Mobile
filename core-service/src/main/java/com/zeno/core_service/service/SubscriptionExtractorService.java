@@ -8,10 +8,15 @@ import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+
 import com.zeno.core_service.entity.Subscription;
+import com.zeno.core_service.repository.SubscriptionRepository;
 
 @Service
 public class SubscriptionExtractorService {
+
+    private final SubscriptionRepository subscriptionRepository;
 
     @Value("${groq.api.key}")
     private String groqApiKey;
@@ -22,7 +27,8 @@ public class SubscriptionExtractorService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public SubscriptionExtractorService(ObjectMapper objectMapper) {
+    public SubscriptionExtractorService(SubscriptionRepository subscriptionRepository, ObjectMapper objectMapper) {
+        this.subscriptionRepository = subscriptionRepository;
         this.restTemplate = new RestTemplate();
         this.objectMapper = objectMapper;
     }
@@ -46,8 +52,9 @@ public class SubscriptionExtractorService {
         messageUser.put("content", emailText);
 
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "llama3-70b-8192");
+        requestBody.put("model", "llama-3.3-70b-versatile");
         requestBody.put("messages", List.of(messageSystem, messageUser));
+        requestBody.put("response_format", Map.of("type", "json_object"));
         requestBody.put("temperature", 0.1);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
@@ -69,5 +76,9 @@ public class SubscriptionExtractorService {
             System.err.println("Failed to extract subscription: " + e.getMessage());
         }
         return null;
+    }
+
+    public List<Subscription> getAllforUser(UUID userid){
+        return subscriptionRepository.findByUserId(userid);
     }
 }

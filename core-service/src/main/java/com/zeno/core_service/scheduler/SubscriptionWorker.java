@@ -37,7 +37,7 @@ public class SubscriptionWorker {
     }
 
     // Runs at midnight and 6:00 PM
-    @Scheduled(cron = "0 0 0,18 * * ?")
+    @Scheduled(cron = "0 36 18 * * ?")
     public void runSubscriptionExtraction() {
         System.out.println("Starting Subscription Extraction Job...");
 

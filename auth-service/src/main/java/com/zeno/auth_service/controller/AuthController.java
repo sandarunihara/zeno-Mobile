@@ -15,6 +15,10 @@ import com.zeno.auth_service.dto.GoogleConnectedUserDto;
 import com.zeno.auth_service.service.AuthService;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.http.HttpStatus;
+import com.zeno.auth_service.entity.User;
+import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,12 +48,40 @@ public class AuthController {
     }
 
     @PostMapping("/connect-gmail")
-    public ResponseEntity<String> connectGmail(@RequestBody ConnectGmailRequest request){
+    public ResponseEntity<String> connectGmail(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody ConnectGmailRequest request){
         try{
-            authService.connectGmail(request);
+            String token = null;
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                token = authHeader.substring(7);
+            }
+            authService.connectGmail(token, request);
             return ResponseEntity.ok("Gmail connected successfully");
         }catch(Exception e){
             return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getMe(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid Authorization header.");
+        }
+        String token = authHeader.substring(7);
+        try {
+            UUID userId = authService.extractUserIdFromToken(token);
+            User user = authService.getUserById(userId);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+            }
+            return ResponseEntity.ok(GoogleConnectedUserDto.builder()
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .gmailToken(user.getGmailToken())
+                    .build());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token: " + e.getMessage());
         }
     }
 
