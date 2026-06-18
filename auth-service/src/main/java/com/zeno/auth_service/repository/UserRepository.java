@@ -12,5 +12,6 @@ public interface UserRepository extends JpaRepository<User,UUID> {
     User findByEmail(String email);
 
     User findByRefreshToken(String refreshToken);
-    
+
+    java.util.List<User> findByGmailTokenIsNotNull();
 }

@@ -372,6 +372,14 @@ public class TaskService {
         if (existingTask == null) {
             return new TaskResponce(false, null, "Task not found");
         }
+
+        if (existingTask.getHasMicroSteps() != null && existingTask.getHasMicroSteps()) {
+            List<Tasks> microSteps = tasksRepository.findByParentTaskId(taskId);
+            if (microSteps != null && !microSteps.isEmpty()) {
+                tasksRepository.deleteAll(microSteps);
+            }
+        }
+
         tasksRepository.delete(existingTask);
         return new TaskResponce(true, null, "Task deleted successfully");
     }

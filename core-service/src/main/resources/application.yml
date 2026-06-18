@@ -22,3 +22,8 @@ groq:
   api:
     key: "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"
     url: "https://api.groq.com/openai/v1/chat/completions"
+
+google:
+  client:
+    id: "636937484642-75d0g92ab923ucc30fqjgl8a9hh0ahln.apps.googleusercontent.com"
+    secret: "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"

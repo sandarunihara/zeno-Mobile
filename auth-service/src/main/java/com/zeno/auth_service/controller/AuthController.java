@@ -10,7 +10,11 @@ import com.zeno.auth_service.dto.AuthRequest;
 import com.zeno.auth_service.dto.AuthResponse;
 import com.zeno.auth_service.dto.RefreshTokenRequest;
 import com.zeno.auth_service.dto.RegisterRequest;
+import com.zeno.auth_service.dto.ConnectGmailRequest;
+import com.zeno.auth_service.dto.GoogleConnectedUserDto;
 import com.zeno.auth_service.service.AuthService;
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
 
 import lombok.RequiredArgsConstructor;
 
@@ -37,6 +41,21 @@ public class AuthController {
     public ResponseEntity<AuthResponse> refreshtoken(@RequestBody RefreshTokenRequest request){
         AuthResponse response = authService.refreshtoken(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/connect-gmail")
+    public ResponseEntity<String> connectGmail(@RequestBody ConnectGmailRequest request){
+        try{
+            authService.connectGmail(request);
+            return ResponseEntity.ok("Gmail connected successfully");
+        }catch(Exception e){
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/google-connected-users")
+    public ResponseEntity<List<GoogleConnectedUserDto>> getGoogleConnectedUsers() {
+        return ResponseEntity.ok(authService.getGoogleConnectedUsers());
     }
 
     @PostMapping("/extract-user-id")

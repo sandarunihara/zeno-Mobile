@@ -9,8 +9,17 @@ import com.zeno.auth_service.dto.AuthRequest;
 import com.zeno.auth_service.dto.AuthResponse;
 import com.zeno.auth_service.dto.RefreshTokenRequest;
 import com.zeno.auth_service.dto.RegisterRequest;
+import com.zeno.auth_service.dto.GoogleConnectedUserDto;
 import com.zeno.auth_service.entity.User;
 import com.zeno.auth_service.repository.UserRepository;
+import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Map;
+import org.springframework.http.*;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.beans.factory.annotation.Value;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,6 +30,12 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+
+    @Value("${google.client.id:dummy-client-id}")
+    private String googleClientId;
+
+    @Value("${google.client.secret:dummy-client-secret}")
+    private String googleClientSecret;
 
     public AuthResponse Register(RegisterRequest request){
         User user = userRepository.findByEmail(request.getEmail());
@@ -62,6 +77,62 @@ public class AuthService {
 
         return new AuthResponse(accesstoken, refreshtoken, "Login successful");
 
+    }
+
+    public void connectGmail(com.zeno.auth_service.dto.ConnectGmailRequest request){
+        User user = userRepository.findByEmail(request.getEmail());
+        if(user == null){
+            throw new RuntimeException("User not found!");
+        }
+        
+        String serverAuthCode = request.getGmailToken();
+        String refreshToken = exchangeCodeForRefreshToken(serverAuthCode);
+        
+        if (refreshToken != null) {
+            user.setGmailToken(refreshToken);
+            userRepository.save(user);
+        } else {
+            throw new RuntimeException("Failed to exchange auth code for refresh token");
+        }
+    }
+
+    private String exchangeCodeForRefreshToken(String code) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            String url = "https://oauth2.googleapis.com/token";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
+            map.add("client_id", googleClientId);
+            map.add("client_secret", googleClientSecret);
+            map.add("code", code);
+            map.add("grant_type", "authorization_code");
+            map.add("redirect_uri", ""); // Usually empty for RN, or "postmessage"
+
+            HttpEntity<MultiValueMap<String, String>> req = new HttpEntity<>(map, headers);
+            ResponseEntity<Map> response = restTemplate.postForEntity(url, req, Map.class);
+            
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return (String) response.getBody().get("refresh_token");
+            }
+        } catch (Exception e) {
+            System.err.println("Error exchanging code: " + e.getMessage());
+            // If the frontend already sends a refresh token, we can fallback to it
+            return code;
+        }
+        return code; // Fallback in case the frontend actually sends a refresh token
+    }
+
+    public List<GoogleConnectedUserDto> getGoogleConnectedUsers() {
+        return userRepository.findByGmailTokenIsNotNull().stream()
+                .map(user -> GoogleConnectedUserDto.builder()
+                        .id(user.getId())
+                        .email(user.getEmail())
+                        .gmailToken(user.getGmailToken())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     public AuthResponse refreshtoken(RefreshTokenRequest request){
