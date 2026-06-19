@@ -39,4 +39,13 @@ public class Subscription {
     @Column(name = "status", length = 50)
     @Builder.Default
     private String status = "UNREVIEWED";
+
+    @Column(name = "sender_email")
+    private String senderEmail;
+
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
+    @Column(name = "payment_date", length = 100)
+    private String paymentDate;
 }

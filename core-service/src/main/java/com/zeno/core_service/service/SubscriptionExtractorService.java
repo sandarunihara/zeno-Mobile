@@ -40,7 +40,8 @@ public class SubscriptionExtractorService {
 
         String systemPrompt = "You are a finance assistant. Extract the subscription details from the following email snippet. "
                 + "Return ONLY a raw JSON object with the following keys exactly: 'serviceName' (string), 'cost' (number), "
-                + "'currency' (string like USD, LKR), 'billingCycle' (string like Monthly, Yearly). "
+                + "'currency' (string like USD, LKR), 'billingCycle' (string like Monthly, Yearly), "
+                + "'paymentDate' (string representing the date the payment happened or needs to happen, in YYYY-MM-DD format if possible, otherwise a description like '15th of each month' or null). "
                 + "If you cannot find a recurring subscription, return an empty JSON object {}. Do not use markdown blocks.";
 
         Map<String, Object> messageSystem = new HashMap<>();

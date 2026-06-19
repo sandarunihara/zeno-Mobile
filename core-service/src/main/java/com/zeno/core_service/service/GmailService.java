@@ -1,5 +1,6 @@
 package com.zeno.core_service.service;
 
+import com.zeno.core_service.dto.GmailMessageDto;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -48,7 +49,7 @@ public class GmailService {
         throw new RuntimeException("Failed to get Google Access Token");
     }
 
-    public List<String> fetchRecentReceiptEmails(String accessToken) {
+    public List<GmailMessageDto> fetchRecentReceiptEmails(String accessToken) {
         // Query to search for recent receipts/subscriptions in the last day
         String query = "subject:receipt OR subject:subscription newer_than:1d";
         String url = "https://gmail.googleapis.com/gmail/v1/users/me/messages?q=" + query;
@@ -59,23 +60,23 @@ public class GmailService {
 
         ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
         
-        List<String> emailContents = new ArrayList<>();
+        List<GmailMessageDto> emails = new ArrayList<>();
         if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
             List<Map<String, Object>> messages = (List<Map<String, Object>>) response.getBody().get("messages");
             if (messages != null) {
                 for (Map<String, Object> message : messages) {
                     String messageId = (String) message.get("id");
-                    String content = fetchEmailContent(accessToken, messageId);
+                    GmailMessageDto content = fetchEmailDetails(accessToken, messageId);
                     if (content != null) {
-                        emailContents.add(content);
+                        emails.add(content);
                     }
                 }
             }
         }
-        return emailContents;
+        return emails;
     }
 
-    private String fetchEmailContent(String accessToken, String messageId) {
+    private GmailMessageDto fetchEmailDetails(String accessToken, String messageId) {
         String url = "https://gmail.googleapis.com/gmail/v1/users/me/messages/" + messageId + "?format=full";
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
@@ -86,17 +87,102 @@ public class GmailService {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Map<String, Object> bodyMap = response.getBody();
                 Map<String, Object> payload = (Map<String, Object>) bodyMap.get("payload");
+                
                 String fullBody = extractBodyFromPayload(payload);
-                if (fullBody != null && !fullBody.trim().isEmpty()) {
-                    return fullBody;
+                if (fullBody == null || fullBody.trim().isEmpty()) {
+                    fullBody = (String) bodyMap.get("snippet");
                 }
-                // Fallback to snippet if body decoding yields nothing
-                return (String) bodyMap.get("snippet");
+                
+                Map<String, Object> userInfo = getUserInfo(accessToken);
+                String userEmail = userInfo != null ? (String) userInfo.get("email") : null;
+                String userPicture = userInfo != null ? (String) userInfo.get("picture") : null;
+
+                String fromHeader = extractFromHeader(payload);
+                String senderEmail = extractSenderEmail(fromHeader);
+                String avatarUrl = getAvatarUrl(senderEmail, userEmail, userPicture);
+
+                return GmailMessageDto.builder()
+                        .body(fullBody)
+                        .senderEmail(senderEmail)
+                        .avatarUrl(avatarUrl)
+                        .build();
             }
         } catch (Exception e) {
             System.err.println("Failed to fetch email " + messageId + ": " + e.getMessage());
         }
         return null;
+    }
+
+    private Map<String, Object> getUserInfo(String accessToken) {
+        String url = "https://www.googleapis.com/oauth2/v3/userinfo";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return response.getBody();
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to fetch Google userinfo: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private String extractFromHeader(Map<String, Object> payload) {
+        if (payload == null) return null;
+        List<Map<String, Object>> headers = (List<Map<String, Object>>) payload.get("headers");
+        if (headers != null) {
+            for (Map<String, Object> header : headers) {
+                String name = (String) header.get("name");
+                if ("From".equalsIgnoreCase(name)) {
+                    return (String) header.get("value");
+                }
+            }
+        }
+        return null;
+    }
+
+    private String extractSenderEmail(String fromHeader) {
+        if (fromHeader == null) {
+            return null;
+        }
+        int start = fromHeader.indexOf('<');
+        int end = fromHeader.indexOf('>');
+        if (start != -1 && end != -1 && start < end) {
+            return fromHeader.substring(start + 1, end).trim();
+        }
+        return fromHeader.trim();
+    }
+
+    private String getAvatarUrl(String email, String userEmail, String userPicture) {
+        if (email == null || !email.contains("@")) {
+            return null;
+        }
+        if (userEmail != null && email.equalsIgnoreCase(userEmail.trim()) && userPicture != null) {
+            return userPicture;
+        }
+        String domain = email.substring(email.indexOf('@') + 1);
+        List<String> personalDomains = List.of("gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", "aol.com");
+        if (personalDomains.contains(domain.toLowerCase())) {
+            String hash = md5Hex(email.toLowerCase().trim());
+            return "https://www.gravatar.com/avatar/" + hash + "?d=identicon";
+        }
+        return "https://logo.clearbit.com/" + domain;
+    }
+
+    private String md5Hex(String message) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] array = md.digest(message.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : array) {
+                sb.append(Integer.toHexString((b & 0xFF) | 0x100).substring(1, 3));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return "";
+        }
     }
 
     private String extractBodyFromPayload(Map<String, Object> payload) {

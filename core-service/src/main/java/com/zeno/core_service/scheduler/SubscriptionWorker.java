@@ -1,5 +1,6 @@
 package com.zeno.core_service.scheduler;
 
+import com.zeno.core_service.dto.GmailMessageDto;
 import com.zeno.core_service.dto.GoogleConnectedUserDto;
 import com.zeno.core_service.entity.Subscription;
 import com.zeno.core_service.repository.SubscriptionRepository;
@@ -37,7 +38,7 @@ public class SubscriptionWorker {
     }
 
     // Runs at midnight and 6:00 PM
-    @Scheduled(cron = "0 36 18 * * ?")
+    @Scheduled(cron = "0 0 0,18 * * ?")
     public void runSubscriptionExtraction() {
         System.out.println("Starting Subscription Extraction Job...");
 
@@ -63,13 +64,15 @@ public class SubscriptionWorker {
                     String accessToken = gmailService.getAccessToken(user.getGmailToken());
 
                     // b. Fetch recent receipt emails
-                    List<String> emails = gmailService.fetchRecentReceiptEmails(accessToken);
+                    List<GmailMessageDto> emails = gmailService.fetchRecentReceiptEmails(accessToken);
 
                     // c. Extract subscription data and save
-                    for (String emailText : emails) {
-                        Subscription sub = subscriptionExtractorService.extractSubscriptionData(emailText);
+                    for (GmailMessageDto emailDto : emails) {
+                        Subscription sub = subscriptionExtractorService.extractSubscriptionData(emailDto.getBody());
                         if (sub != null && sub.getServiceName() != null) {
                             sub.setUserId(user.getId());
+                            sub.setSenderEmail(emailDto.getSenderEmail());
+                            sub.setAvatarUrl(emailDto.getAvatarUrl());
                             subscriptionRepository.save(sub);
                             System.out.println("Saved new subscription for user " + user.getId() + ": " + sub.getServiceName());
                         }
