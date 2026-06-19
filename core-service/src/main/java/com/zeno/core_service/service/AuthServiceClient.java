@@ -4,10 +4,12 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import com.zeno.core_service.dto.GoogleConnectedUserDto;
 
 import java.util.UUID;
 
@@ -51,4 +53,21 @@ public class AuthServiceClient {
             throw new RuntimeException("Failed to communicate with Auth Service: " + e.getMessage());
         }
     }
-}
+
+    public GoogleConnectedUserDto getConnectedUser(String authHeader) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", authHeader);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        try {
+            ResponseEntity<GoogleConnectedUserDto> response = restTemplate.exchange(
+                "http://AUTH-SERVICE/api/auth/me", 
+                HttpMethod.GET, 
+                entity, 
+                GoogleConnectedUserDto.class
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to get connected user from Auth Service: " + e.getMessage());
+        }
+    }
+}

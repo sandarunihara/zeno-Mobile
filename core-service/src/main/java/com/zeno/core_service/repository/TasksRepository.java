@@ -18,4 +18,9 @@ public interface TasksRepository extends JpaRepository<Tasks, Long> {
     List<Tasks> findByUserIdAndStatus(UUID userId, String status);
 
     List<Tasks> findByParentTaskId(Long parentTaskId);
+
+    boolean existsByUserIdAndTitleAndDeadline(UUID userId, String title, java.time.LocalDateTime deadline);
+
+    boolean existsByUserIdAndCalenderEventId(UUID userId, String calenderEventId);
 }
+

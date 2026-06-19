@@ -58,4 +58,12 @@ public class Tasks {
     @Transient // Tells Hibernate to include this in JSON, but NOT in PostgreSQL
     private List<Tasks> microSteps;
 
+    @Column(name = "is_from_calender")
+    private Boolean isFromCalender;
+
+    @Column(name = "calender_event_id")
+    private String calenderEventId;
+
+    @Column(name = "calender_event_etag")
+    private String calenderEventEtag;
 }

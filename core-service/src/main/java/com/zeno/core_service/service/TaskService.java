@@ -424,6 +424,9 @@ public class TaskService {
             .status(task.getStatus())
             .parentTaskId(task.getParentTaskId())
             .hasMicroSteps(task.getHasMicroSteps())
+            .isFromCalender(task.getIsFromCalender())
+            .calenderEventId(task.getCalenderEventId())
+            .calenderEventEtag(task.getCalenderEventEtag())
             .build();
             
         if (Boolean.TRUE.equals(task.getHasMicroSteps())) {

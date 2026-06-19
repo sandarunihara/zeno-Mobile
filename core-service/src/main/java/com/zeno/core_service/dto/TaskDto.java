@@ -25,4 +25,7 @@ public class TaskDto {
     private Long parentTaskId;
     private Boolean hasMicroSteps;
     private List<TaskDto> microSteps;
+    private Boolean isFromCalender;
+    private String calenderEventId;
+    private String calenderEventEtag;
 }

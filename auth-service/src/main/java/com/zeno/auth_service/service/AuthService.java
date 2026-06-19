@@ -26,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
-    
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -37,40 +37,40 @@ public class AuthService {
     @Value("${google.client.secret:dummy-client-secret}")
     private String googleClientSecret;
 
-    public AuthResponse Register(RegisterRequest request){
+    public AuthResponse Register(RegisterRequest request) {
         User user = userRepository.findByEmail(request.getEmail());
-        if(user != null){
+        if (user != null) {
             throw new RuntimeException("User already exists");
         }
 
         String refreshtoken = jwtService.generateRefreshToken(request.getEmail());
-        
-        user=User.builder()
-        .fname(request.getFname())
-        .lname(request.getLname())
-        .email(request.getEmail())
-        .password(passwordEncoder.encode(request.getPassword()))
-        .refreshToken(refreshtoken)
-        .build();
-        
+
+        user = User.builder()
+                .fname(request.getFname())
+                .lname(request.getLname())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .refreshToken(refreshtoken)
+                .build();
+
         User savedUser = userRepository.save(user);
-        
-        String accesstoken = jwtService.generateAccessToken(savedUser.getId(),request.getEmail());
+
+        String accesstoken = jwtService.generateAccessToken(savedUser.getId(), request.getEmail());
 
         return new AuthResponse(accesstoken, refreshtoken, "User registered successfully");
     }
 
-    public AuthResponse login(AuthRequest request){
-        
+    public AuthResponse login(AuthRequest request) {
+
         User user = userRepository.findByEmail(request.getEmail());
-        if(user == null){
+        if (user == null) {
             throw new RuntimeException("User not found!");
         }
-        if(!passwordEncoder.matches(request.getPassword(), user.getPassword())){
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Invalid credentials!");
         }
 
-        String accesstoken= jwtService.generateAccessToken(user.getId(), user.getEmail());
+        String accesstoken = jwtService.generateAccessToken(user.getId(), user.getEmail());
         String refreshtoken = jwtService.generateRefreshToken(user.getEmail());
         user.setRefreshToken(refreshtoken);
         userRepository.save(user);
@@ -83,7 +83,7 @@ public class AuthService {
         return userRepository.findById(id).orElse(null);
     }
 
-    public void connectGmail(String token, com.zeno.auth_service.dto.ConnectGmailRequest request){
+    public void connectGmail(String token, com.zeno.auth_service.dto.ConnectGmailRequest request) {
         User user = null;
         if (token != null) {
             try {
@@ -98,13 +98,11 @@ public class AuthService {
             user = userRepository.findByEmail(request.getEmail());
         }
 
-        if(user == null){
+        if (user == null) {
             throw new RuntimeException("User not found!");
         }
-        
         String serverAuthCode = request.getGmailToken();
         String refreshToken = exchangeCodeForRefreshToken(serverAuthCode);
-        
         if (refreshToken != null) {
             user.setGmailToken(refreshToken);
             userRepository.save(user);
@@ -130,10 +128,14 @@ public class AuthService {
 
             HttpEntity<MultiValueMap<String, String>> req = new HttpEntity<>(map, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(url, req, Map.class);
-            
+
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return (String) response.getBody().get("refresh_token");
             }
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            String errorBody = e.getResponseBodyAsString();
+            System.err.println("Google OAuth Token Exchange Error: " + errorBody);
+            throw new RuntimeException("Google token exchange failed: " + errorBody);
         } catch (Exception e) {
             System.err.println("Error exchanging code: " + e.getMessage());
             throw new RuntimeException("Google token exchange failed: " + e.getMessage());
@@ -151,15 +153,15 @@ public class AuthService {
                 .collect(Collectors.toList());
     }
 
-    public AuthResponse refreshtoken(RefreshTokenRequest request){
+    public AuthResponse refreshtoken(RefreshTokenRequest request) {
         User user = userRepository.findByRefreshToken(request.getRefreshtoken());
-        if(user == null){
+        if (user == null) {
             throw new RuntimeException("Invalid refresh token!");
         }
 
         String refreshtoken = request.getRefreshtoken();
         String email = jwtService.extractEmail(refreshtoken);
-        if(!email.equals(user.getEmail())){
+        if (!email.equals(user.getEmail())) {
             throw new RuntimeException("User not found for the provided refresh token!");
         }
 
@@ -168,23 +170,20 @@ public class AuthService {
 
     }
 
-    public boolean validateToken(String token){
-        try{
+    public boolean validateToken(String token) {
+        try {
             String email = jwtService.extractEmail(token);
             return email != null;
-        }catch(Exception e){
+        } catch (Exception e) {
             return false;
         }
     }
 
-    public UUID extractUserIdFromToken(String token){
-        try{
+    public UUID extractUserIdFromToken(String token) {
+        try {
             return jwtService.extractUserId(token);
-        }catch(Exception e){
+        } catch (Exception e) {
             throw new RuntimeException("Invalid token!");
         }
     }
 }
-
-
-

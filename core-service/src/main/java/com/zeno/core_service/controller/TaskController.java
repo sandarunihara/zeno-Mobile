@@ -19,6 +19,9 @@ import com.zeno.core_service.dto.TaskResponce;
 import com.zeno.core_service.dto.Taskfullresponce;
 import com.zeno.core_service.service.AuthServiceClient;
 import com.zeno.core_service.service.TaskService;
+import com.zeno.core_service.service.GoogleCalendarService;
+import com.zeno.core_service.dto.GoogleConnectedUserDto;
+import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,8 @@ public class TaskController {
     
     private final TaskService taskService;
     private final AuthServiceClient authServiceClient;
+    private final GoogleCalendarService googleCalendarService;
+
 
     private UUID getUserIdFromAuthService(HttpServletRequest request){
         String authHeader = request.getHeader("Authorization");
@@ -97,4 +102,25 @@ public class TaskController {
         UUID userId = getUserIdFromAuthService(httprequest);
         return ResponseEntity.ok(taskService.getTasks(userId));
     }
+
+    @PostMapping("/sync-calendar")
+    public ResponseEntity<?> syncGoogleCalendar(HttpServletRequest httpRequest) {
+        String authHeader = httpRequest.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).body("Missing or invalid Authorization header.");
+        }
+        
+        try {
+            GoogleConnectedUserDto connectedUser = authServiceClient.getConnectedUser(authHeader);
+            if (connectedUser == null || connectedUser.getGmailToken() == null) {
+                return ResponseEntity.badRequest().body("No Google account connected. Please connect Gmail/Calendar first.");
+            }
+            
+            googleCalendarService.syncCalendarForUser(connectedUser.getId(), connectedUser.getGmailToken());
+            return ResponseEntity.ok(Map.of("success", true, "message", "Google Calendar synced successfully."));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Calendar sync failed: " + e.getMessage());
+        }
+    }
 }
+
