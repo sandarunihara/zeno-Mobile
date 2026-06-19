@@ -10,6 +10,7 @@ import com.zeno.auth_service.dto.AuthResponse;
 import com.zeno.auth_service.dto.RefreshTokenRequest;
 import com.zeno.auth_service.dto.RegisterRequest;
 import com.zeno.auth_service.dto.GoogleConnectedUserDto;
+import com.zeno.auth_service.dto.UserProfileDto;
 import com.zeno.auth_service.entity.User;
 import com.zeno.auth_service.repository.UserRepository;
 import java.util.stream.Collectors;
@@ -185,5 +186,25 @@ public class AuthService {
         } catch (Exception e) {
             throw new RuntimeException("Invalid token!");
         }
+    }
+
+    public UserProfileDto updateProfile(UUID userId, UserProfileDto updateDto) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setFname(updateDto.getFname());
+        user.setLname(updateDto.getLname());
+        user.setHeight(updateDto.getHeight());
+        user.setWeight(updateDto.getWeight());
+        user.setHobbies(updateDto.getHobbies());
+        User saved = userRepository.save(user);
+        return UserProfileDto.builder()
+                .id(saved.getId())
+                .email(saved.getEmail())
+                .fname(saved.getFname())
+                .lname(saved.getLname())
+                .height(saved.getHeight())
+                .weight(saved.getWeight())
+                .hobbies(saved.getHobbies())
+                .build();
     }
 }

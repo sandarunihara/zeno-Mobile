@@ -15,9 +15,11 @@ import com.zeno.auth_service.dto.GoogleConnectedUserDto;
 import com.zeno.auth_service.service.AuthService;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.http.HttpStatus;
 import com.zeno.auth_service.entity.User;
+import com.zeno.auth_service.dto.UserProfileDto;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
@@ -75,13 +77,34 @@ public class AuthController {
             if (user == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
             }
-            return ResponseEntity.ok(GoogleConnectedUserDto.builder()
+            return ResponseEntity.ok(UserProfileDto.builder()
                     .id(user.getId())
                     .email(user.getEmail())
-                    .gmailToken(user.getGmailToken())
+                    .fname(user.getFname())
+                    .lname(user.getLname())
+                    .height(user.getHeight())
+                    .weight(user.getWeight())
+                    .hobbies(user.getHobbies())
                     .build());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<?> updateMe(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody UserProfileDto updateDto) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Missing or invalid Authorization header.");
+        }
+        String token = authHeader.substring(7);
+        try {
+            UUID userId = authService.extractUserIdFromToken(token);
+            UserProfileDto updated = authService.updateProfile(userId, updateDto);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
 
