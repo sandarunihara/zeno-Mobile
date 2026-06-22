@@ -9,4 +9,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class StepRecordRequest {
     private Integer steps;
+    private String date;
 }

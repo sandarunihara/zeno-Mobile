@@ -85,6 +85,7 @@ public class AuthController {
                     .height(user.getHeight())
                     .weight(user.getWeight())
                     .hobbies(user.getHobbies())
+                    .gmailToken(user.getGmailToken())
                     .build());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token: " + e.getMessage());

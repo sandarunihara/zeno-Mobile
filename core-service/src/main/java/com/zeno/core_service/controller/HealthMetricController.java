@@ -37,7 +37,7 @@ public class HealthMetricController {
     @PostMapping("/steps")
     public ResponseEntity<Void> recordSteps(HttpServletRequest request, @RequestBody StepRecordRequest recordRequest) {
         UUID userId = getUserIdFromAuthService(request);
-        healthMetricService.recordSteps(userId, recordRequest.getSteps());
+        healthMetricService.recordSteps(userId, recordRequest.getSteps(), recordRequest.getDate());
         return ResponseEntity.ok().build();
     }
 

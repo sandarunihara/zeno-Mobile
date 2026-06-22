@@ -19,4 +19,5 @@ public class UserProfileDto {
     private Double height;
     private Double weight;
     private List<String> hobbies;
+    private String gmailToken;
 }

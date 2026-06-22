@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
+import java.time.ZoneId;
+import java.time.Instant;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,12 +24,26 @@ public class HealthMetricService {
     private final HealthMetricRepository healthMetricRepository;
 
     @Transactional
-    public void recordSteps(UUID userId, Integer steps) {
+    public void recordSteps(UUID userId, Integer steps, String dateStr) {
+        LocalDateTime loggedAt = LocalDateTime.now();
+        if (dateStr != null && !dateStr.isEmpty()) {
+            try {
+                LocalDate date = LocalDate.parse(dateStr);
+                if (date.equals(LocalDate.now())) {
+                    loggedAt = LocalDateTime.now();
+                } else {
+                    loggedAt = date.atTime(23, 59, 59);
+                }
+            } catch (Exception e) {
+                // Ignore and use now()
+            }
+        }
+        
         HealthMetric metric = HealthMetric.builder()
                 .userId(userId)
                 .metricType("STEP_COUNT")
                 .value(steps)
-                .loggedAt(LocalDateTime.now())
+                .loggedAt(loggedAt)
                 .build();
         healthMetricRepository.save(metric);
     }
