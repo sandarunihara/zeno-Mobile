@@ -28,7 +28,7 @@ public class MoodController {
         String authHeader = request.getHeader("Authorization");
         
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new RuntimeException("Missing or invalid Authorization header.");
+            throw new com.zeno.core_service.exception.UnauthorizedException("Missing or invalid Authorization header.");
         }
         String token = authHeader.substring(7);
         

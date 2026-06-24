@@ -56,6 +56,9 @@ public class User {
     @Column(name = "weight")
     private Double weight;
 
+    @Column(name = "sleep_target")
+    private Double sleepTarget;
+
     @Builder.Default
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "hobbies", columnDefinition = "jsonb")

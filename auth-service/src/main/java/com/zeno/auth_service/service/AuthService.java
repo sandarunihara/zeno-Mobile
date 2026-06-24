@@ -52,6 +52,7 @@ public class AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .refreshToken(refreshtoken)
+                .sleepTarget(8.0)
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -195,6 +196,7 @@ public class AuthService {
         user.setLname(updateDto.getLname());
         user.setHeight(updateDto.getHeight());
         user.setWeight(updateDto.getWeight());
+        user.setSleepTarget(updateDto.getSleepTarget());
         user.setHobbies(updateDto.getHobbies());
         User saved = userRepository.save(user);
         return UserProfileDto.builder()
@@ -204,6 +206,7 @@ public class AuthService {
                 .lname(saved.getLname())
                 .height(saved.getHeight())
                 .weight(saved.getWeight())
+                .sleepTarget(saved.getSleepTarget())
                 .hobbies(saved.getHobbies())
                 .build();
     }

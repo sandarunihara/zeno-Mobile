@@ -18,6 +18,7 @@ public class UserProfileDto {
     private String lname;
     private Double height;
     private Double weight;
+    private Double sleepTarget;
     private List<String> hobbies;
     private String gmailToken;
 }

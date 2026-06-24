@@ -84,6 +84,7 @@ public class AuthController {
                     .lname(user.getLname())
                     .height(user.getHeight())
                     .weight(user.getWeight())
+                    .sleepTarget(user.getSleepTarget())
                     .hobbies(user.getHobbies())
                     .gmailToken(user.getGmailToken())
                     .build());

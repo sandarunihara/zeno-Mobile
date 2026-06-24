@@ -12,6 +12,22 @@ import java.time.LocalDateTime;
 @RestControllerAdvice 
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorizedException(UnauthorizedException ex) {
+        ex.printStackTrace();
+        String errorMessage = ex.getMessage() == null ? ex.toString() : ex.getMessage();
+        
+        ErrorResponse errorResponse = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                "Unauthorized",
+                errorMessage,
+                false
+        );
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+    }
+
     // This tells Spring: "If a RuntimeException happens anywhere, send it here!"
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {

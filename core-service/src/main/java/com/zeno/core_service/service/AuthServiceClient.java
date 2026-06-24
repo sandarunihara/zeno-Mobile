@@ -36,7 +36,7 @@ public class AuthServiceClient {
             
             
             if (Boolean.FALSE.equals(validateResponse.getBody())) {
-                throw new RuntimeException("Unauthorized: Invalid token");
+                throw new com.zeno.core_service.exception.UnauthorizedException("Unauthorized: Invalid token");
             }
             
             // 3. Call the Extract Endpoint
@@ -49,6 +49,8 @@ public class AuthServiceClient {
             // 4. Return the safely extracted UUID
             return UUID.fromString(idResponse.getBody());
 
+        } catch (com.zeno.core_service.exception.UnauthorizedException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Failed to communicate with Auth Service: " + e.getMessage());
         }
@@ -70,4 +72,4 @@ public class AuthServiceClient {
             throw new RuntimeException("Failed to get connected user from Auth Service: " + e.getMessage());
         }
     }
-}
+}
