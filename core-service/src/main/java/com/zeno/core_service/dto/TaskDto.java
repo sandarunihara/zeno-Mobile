@@ -20,6 +20,8 @@ public class TaskDto {
     private String description;
     private String effort_level;
     private LocalDateTime deadline;
+    private LocalDateTime startTime;
+    private Integer estimatedTime;
     private Boolean is_critical;
     private String status;
     private Long parentTaskId;

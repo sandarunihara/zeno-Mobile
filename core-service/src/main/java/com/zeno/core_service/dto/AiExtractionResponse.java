@@ -7,6 +7,6 @@ public record AiExtractionResponse(
     List<AiExtractedTask> tasks,
     AiExtractedMood mood
 ) {
-    public record AiExtractedTask(String title,String description, String effortLevel, LocalDateTime deadline) {}
+    public record AiExtractedTask(String title,String description, String effortLevel, LocalDateTime deadline, LocalDateTime startTime, Integer estimatedTime) {}
     public record AiExtractedMood(Integer energyScore, String sentiment, Boolean isLight) {}
 }

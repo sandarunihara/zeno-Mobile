@@ -43,6 +43,12 @@ public class Tasks {
     @Column(name = "deadline")
     private LocalDateTime deadline;
 
+    @Column(name = "start_time")
+    private LocalDateTime startTime;
+
+    @Column(name = "estimated_time")
+    private Integer estimatedTime;
+
     @Column(name = "is_critical")
     private Boolean is_critical;
 

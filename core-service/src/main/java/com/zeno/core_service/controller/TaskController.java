@@ -21,6 +21,7 @@ import com.zeno.core_service.service.AuthServiceClient;
 import com.zeno.core_service.service.TaskService;
 import com.zeno.core_service.service.GoogleCalendarService;
 import com.zeno.core_service.dto.GoogleConnectedUserDto;
+import com.zeno.core_service.dto.FreeTimeResponse;
 import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -101,6 +102,12 @@ public class TaskController {
     public ResponseEntity<?> getTasks(HttpServletRequest httprequest){
         UUID userId = getUserIdFromAuthService(httprequest);
         return ResponseEntity.ok(taskService.getTasks(userId));
+    }
+
+    @GetMapping("/freetime")
+    public ResponseEntity<FreeTimeResponse> getTodaysFreeTime(HttpServletRequest httprequest){
+        UUID userId = getUserIdFromAuthService(httprequest);
+        return ResponseEntity.ok(taskService.getTodaysFreeTime(userId));
     }
 
     @PostMapping("/sync-calendar")

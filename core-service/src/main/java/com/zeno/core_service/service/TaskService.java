@@ -20,9 +20,16 @@ import com.zeno.core_service.dto.ManualTaskRequest;
 import com.zeno.core_service.dto.TaskResponce;
 import com.zeno.core_service.dto.Taskfullresponce;
 import com.zeno.core_service.dto.TaskDto;
+import com.zeno.core_service.dto.FreeTimeSlotDto;
+import com.zeno.core_service.dto.FreeTimeResponse;
+import com.zeno.core_service.dto.AiEstimationResponse;
+import com.zeno.core_service.dto.AiEstimationDto;
 import com.zeno.core_service.entity.MoodLog;
 import com.zeno.core_service.entity.Tasks;
 import com.zeno.core_service.repository.TasksRepository;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,6 +61,8 @@ public class TaskService {
             .description(request.description())
             .effort_level(request.effortLevel())
             .deadline(request.deadline() != null ? java.time.LocalDateTime.parse(request.deadline()) : null)
+            .startTime(request.startTime() != null ? java.time.LocalDateTime.parse(request.startTime()) : null)
+            .estimatedTime(request.estimatedTime())
             .is_critical(request.isCritical())
             .status("PENDING")
             .hasMicroSteps(false)
@@ -76,7 +85,9 @@ public class TaskService {
                             + "'title' (string, a short clean task name), "
                             + "'description' (string, a more detailed explanation), "
                             + "'effortLevel' (string, either 'Low' or 'High'), "
-                            + "'deadline' (string, ISO-8601 format like '" + currentDateTime + "', calculate accurate relative dates based on the current date, or null if no deadline). "
+                            + "'deadline' (string, ISO-8601 format like '" + currentDateTime + "', calculate accurate relative dates based on the current date, or null if no deadline), "
+                            + "'startTime' (string, ISO-8601 format, or null if not mentioned), "
+                            + "'estimatedTime' (integer, estimated duration in minutes, or null). "
                             + "2. 'mood': guess their current state. An object containing: "
                             + "'energyScore' (integer 1 to 10 based on their vibe), "
                             + "'sentiment' (short string like 'anxious', 'calm', or 'motivated'), and "
@@ -122,18 +133,24 @@ public class TaskService {
 
             List<Tasks> newTasks = extractedData.tasks().stream()
                     .filter(dto -> !isNoTaskPlaceholder(dto.title(), dto.description()))
-                    .map(dto ->
-                    Tasks.builder()
+                    .map(dto -> {
+                        LocalDateTime finalStartTime = dto.startTime();
+                        if (finalStartTime == null && dto.deadline() != null && dto.estimatedTime() != null) {
+                            finalStartTime = dto.deadline().minusMinutes(dto.estimatedTime());
+                        }
+                        return Tasks.builder()
                             .userId(userId)
                             .title(dto.title())
                             .description(dto.description())
                             .effort_level(dto.effortLevel())
                             .deadline(dto.deadline())
+                            .startTime(finalStartTime)
+                            .estimatedTime(dto.estimatedTime())
                             .is_critical("High".equalsIgnoreCase(dto.effortLevel()))
                             .status("PENDING")
                             .hasMicroSteps(false)
-                            .build()
-                        ).toList();
+                            .build();
+                    }).toList();
 
             if (newTasks.isEmpty()) {
                 return new AiTaskResponce(true, List.of(), "No actionable tasks found in transcript");
@@ -349,6 +366,8 @@ public class TaskService {
             existingTask.setDescription(request.description()== null ? existingTask.getDescription() : request.description());
             existingTask.setEffort_level(request.effortLevel()== null ? existingTask.getEffort_level() : request.effortLevel());
             existingTask.setDeadline(request.deadline() != null ? java.time.LocalDateTime.parse(request.deadline()) : existingTask.getDeadline());
+            existingTask.setStartTime(request.startTime() != null ? java.time.LocalDateTime.parse(request.startTime()) : existingTask.getStartTime());
+            existingTask.setEstimatedTime(request.estimatedTime() == null ? existingTask.getEstimatedTime() : request.estimatedTime());
             existingTask.setIs_critical(request.isCritical()== null ? existingTask.getIs_critical() : request.isCritical());
             existingTask.setStatus(request.status()== null ? existingTask.getStatus() : request.status());
         }catch (Exception e){
@@ -420,6 +439,8 @@ public class TaskService {
             .description(task.getDescription())
             .effort_level(task.getEffort_level())
             .deadline(task.getDeadline())
+            .startTime(task.getStartTime())
+            .estimatedTime(task.getEstimatedTime())
             .is_critical(task.getIs_critical())
             .status(task.getStatus())
             .parentTaskId(task.getParentTaskId())
@@ -437,5 +458,118 @@ public class TaskService {
             dto.setMicroSteps(microSteps);
         }
         return dto;
+    }
+
+    class TimeBlock {
+        LocalDateTime start;
+        LocalDateTime end;
+        public TimeBlock(LocalDateTime start, LocalDateTime end) { this.start = start; this.end = end; }
+        public int getDurationMinutes() { return (int) ChronoUnit.MINUTES.between(start, end); }
+    }
+
+    private void occupyTime(List<TimeBlock> freeBlocks, LocalDateTime busyStart, LocalDateTime busyEnd) {
+        List<TimeBlock> newFreeBlocks = new ArrayList<>();
+        for (TimeBlock block : freeBlocks) {
+            if (busyStart.isBefore(block.end) && busyEnd.isAfter(block.start)) {
+                if (busyStart.isAfter(block.start)) {
+                    newFreeBlocks.add(new TimeBlock(block.start, busyStart));
+                }
+                if (busyEnd.isBefore(block.end)) {
+                    newFreeBlocks.add(new TimeBlock(busyEnd, block.end));
+                }
+            } else {
+                newFreeBlocks.add(block);
+            }
+        }
+        freeBlocks.clear();
+        freeBlocks.addAll(newFreeBlocks);
+    }
+
+    public FreeTimeResponse getTodaysFreeTime(UUID userId) {
+        List<Tasks> allPending = tasksRepository.findByUserIdAndStatus(userId, "PENDING");
+        LocalDate today = LocalDate.now();
+        List<Tasks> todaysTasks = allPending.stream().filter(t -> {
+            boolean hasDeadlineToday = t.getDeadline() != null && t.getDeadline().toLocalDate().equals(today);
+            boolean hasStartTimeToday = t.getStartTime() != null && t.getStartTime().toLocalDate().equals(today);
+            boolean isBothNull = t.getDeadline() == null && t.getStartTime() == null;
+            return hasDeadlineToday || hasStartTimeToday || isBothNull;
+        }).toList();
+
+        List<Tasks> needsEstimation = todaysTasks.stream()
+                .filter(t -> t.getEstimatedTime() == null)
+                .toList();
+
+        if (!needsEstimation.isEmpty()) {
+            try {
+                String taskListJson = objectMapper.writeValueAsString(
+                        needsEstimation.stream().map(t -> Map.of("id", t.getId(), "title", t.getTitle(), "description", t.getDescription() == null ? "" : t.getDescription())).toList()
+                );
+                String prompt = "You are a time estimation assistant. Estimate the time in minutes needed to complete each of the following tasks. Return ONLY a valid JSON object with a single key 'estimations' containing an array of objects, where each object has 'taskId' (integer) and 'estimatedTime' (integer). Tasks: " + taskListJson;
+                String response = callGroqApi(prompt);
+                AiEstimationResponse estimationResponse = objectMapper.readValue(response, AiEstimationResponse.class);
+                for (AiEstimationDto est : estimationResponse.estimations()) {
+                    needsEstimation.stream().filter(t -> t.getId().equals(est.taskId())).findFirst().ifPresent(t -> {
+                        t.setEstimatedTime(est.estimatedTime());
+                        tasksRepository.save(t);
+                    });
+                }
+            } catch (Exception e) {
+                System.out.println("Error estimating times: " + e.getMessage());
+            }
+        }
+
+        LocalDateTime dayStart = LocalDateTime.of(today, LocalTime.of(6, 0));
+        LocalDateTime dayEnd = LocalDateTime.of(today, LocalTime.of(23, 30));
+
+        List<TimeBlock> freeBlocks = new ArrayList<>();
+        freeBlocks.add(new TimeBlock(dayStart, dayEnd));
+
+        List<Tasks> floatingTasks = new ArrayList<>();
+        for (Tasks t : todaysTasks) {
+            int duration = t.getEstimatedTime() != null ? t.getEstimatedTime() : 30; // Default 30 mins if still null
+            if (t.getStartTime() != null) {
+                LocalDateTime start = t.getStartTime();
+                LocalDateTime end = start.plusMinutes(duration);
+                occupyTime(freeBlocks, start, end);
+            } else if (t.getDeadline() != null) {
+                LocalDateTime end = t.getDeadline();
+                LocalDateTime start = end.minusMinutes(duration);
+                t.setStartTime(start);
+                tasksRepository.save(t);
+                occupyTime(freeBlocks, start, end);
+            } else {
+                floatingTasks.add(t);
+            }
+        }
+
+        for (Tasks t : floatingTasks) {
+            int duration = t.getEstimatedTime() != null ? t.getEstimatedTime() : 30;
+            for (TimeBlock block : freeBlocks) {
+                if (block.getDurationMinutes() >= duration) {
+                    LocalDateTime start = block.start;
+                    LocalDateTime end = start.plusMinutes(duration);
+                    t.setStartTime(start);
+                    tasksRepository.save(t);
+                    occupyTime(freeBlocks, start, end);
+                    break;
+                }
+            }
+        }
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+        List<FreeTimeSlotDto> slots = new ArrayList<>();
+        int totalFreeTime = 0;
+
+        for (TimeBlock block : freeBlocks) {
+            int duration = block.getDurationMinutes();
+            slots.add(new FreeTimeSlotDto(
+                    block.start.format(formatter),
+                    block.end.format(formatter),
+                    duration
+            ));
+            totalFreeTime += duration;
+        }
+
+        return new FreeTimeResponse(slots, totalFreeTime);
     }
 }
