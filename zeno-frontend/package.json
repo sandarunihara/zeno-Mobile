@@ -1,0 +1,48 @@
+{
+  "name": "zeno-mobile",
+  "version": "1.0.0",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "eject": "expo eject",
+    "postinstall": "node scripts/fix-expo-metro-reporter.js",
+    "build:apk": "eas build --profile preview --platform android",
+    "build:dev": "eas build --profile development --platform android",
+    "android:local": "npx expo run:android"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.4.4",
+    "@react-native-google-signin/google-signin": "^16.1.2",
+    "@react-navigation/bottom-tabs": "^7.15.9",
+    "@react-navigation/native": "^7.2.2",
+    "@react-navigation/native-stack": "^7.3.2",
+    "axios": "^1.6.2",
+    "babel-preset-expo": "~54.0.10",
+    "expo": "~54.0.0",
+    "expo-clipboard": "~8.0.8",
+    "expo-dev-client": "~6.0.21",
+    "expo-secure-store": "~15.0.8",
+    "expo-speech-recognition": "^3.1.3",
+    "expo-splash-screen": "~31.0.13",
+    "lucide-react-native": "^1.8.0",
+    "nativewind": "^4.1.23",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.16.0",
+    "tailwindcss": "^3.4.19"
+  },
+  "devDependencies": {
+    "@expo/cli": "^55.0.23",
+    "@types/node": "^20.0.0",
+    "@types/react": "~19.1.10",
+    "typescript": "^5.3.0"
+  },
+  "private": true
+}

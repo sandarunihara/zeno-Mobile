@@ -1,0 +1,239 @@
+# ============================================================================
+# ZENO MOBILE APP - Full .gitignore for Backend & Frontend
+# ============================================================================
+
+# ============================================================================
+# IDE & EDITOR
+# ============================================================================
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================================
+# BACKEND - Spring Boot / Maven
+# ============================================================================
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Java
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# Spring Boot
+spring-boot-devtools.properties
+
+# ============================================================================
+# FRONTEND - React Native / Expo / Node.js
+# ============================================================================
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Expo
+.expo/
+.expo-shared/
+dist/
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+.env.test.local
+
+# Build & Cache
+build/
+.cache/
+.next/
+out/
+.turbo/
+.parcel-cache
+dist/
+coverage/
+.nyc_output/
+
+# React Native / Android
+android/app/build/
+android/app/release/
+android/build/
+android/.gradle/
+android/local.properties
+*.apk
+*.aab
+
+# React Native / iOS
+ios/Pods/
+ios/Podfile.lock
+ios/build/
+ios/.xcode.env.local
+ios/*.xcworkspace
+
+# React Native Metro bundler
+.bundle/
+.metro/
+
+# Testing
+coverage/
+.coverage
+.pytest_cache/
+.jest/
+
+# OS & Temporary
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+*.swp
+*.swo
+*~
+.viminfo
+.nfs*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+debug.log
+
+# Misc
+.tern-port
+.vuepress/dist
+.cache/
+.nuxt
+dist
+.cache/
+.vuepress/dist
+.nuxt
+dist
+.cache/
+.output
+.env
+.env.*
+!.env.example
+
+# Backup files
+*.bak
+*.swp
+*.swo
+*~
+.#*
+
+# ============================================================================
+# SENSITIVE & CONFIDENTIAL
+# ============================================================================
+# Credentials & Secrets
+*.pem
+*.key
+*.cert
+*.crt
+secrets/
+.env
+.env.*.local
+google-services.json
+GoogleService-Info.plist
+client_secret*.json
+credentials.json
+
+# API Keys & Tokens
+.apikey
+.api_key
+.token
+.tokens
+
+# User-specific files
+*.suo
+*.user
+.vs/
+
+# ============================================================================
+# PROJECT SPECIFIC - Zeno Mobile App
+# ============================================================================
+# Don't ignore the Google OAuth config in root (it's the public client ID)
+# But ignore any local secrets
+!client_secret_*.json
+client_secret_*.json.local
+local_credentials/
+
+# Gradle wrapper
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Maven wrapper
+!.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+
+# ============================================================================
+# DEVELOPMENT ONLY (can uncomment if needed)
+# ============================================================================
+# Temporary development files
+*.tmp
+*.temp
+.debug
+debug_logs/
+
+# IDE temporary files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
